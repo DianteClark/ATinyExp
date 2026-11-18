@@ -1,75 +1,27 @@
 'use strict';
 // ============================================================
-// UNITS: definitions, animation, drawing, effects
+// UNITS: creation, animation, drawing, effects
 // ============================================================
-const SOLDIER_ROWS = { idle: [0, 2, 3], walk: [1, 2, 9], crawl: [2, 2, 4], fire: [3, 2, 12], hit: [4, 3, 10], death: [5, 5, 9], throw: [6, 3, 10] };
-const ROBOT_ROWS = { idle: [0, 2, 3], walk: [1, 4, 10], fire: [2, 2, 10], melee: [3, 5, 12], dead: [4, 1, 1] };
-
-const SQUAD_DEFS = {
-  reyes:  { name: 'Sgt. Reyes',  short: 'REYES',  img: 'leader',    hp: 7, mv: 5, aim: 72, dmg: [2, 3], range: 7,  shots: 1, gun: 'rifle',  voice: 'meghan', shape: 4, rank: 2, color: '#ffd23f', role: 'Squad Leader', perk: 'Leadership: allies within 4 tiles get +10 aim.' },
-  okafor: { name: 'Cpl. Okafor', short: 'OKAFOR', img: 'gunner',    hp: 8, mv: 4, aim: 60, dmg: [1, 1], range: 6,  shots: 4, gun: 'mg',     voice: 'ian',    shape: 0, rank: 1, color: '#ff9a1a', role: 'Machine Gunner', perk: 'Burst: fires several 1-damage rounds. Damage upgrades add rounds.' },
-  haas:   { name: 'Pvt. Haas',   short: 'HAAS',   img: 'grenadier', hp: 7, mv: 4, aim: 65, dmg: [2, 3], range: 6,  shots: 1, gun: 'rifle',  voice: 'sean',   shape: 2, rank: 1, color: '#3ee03e', role: 'Grenadier', perk: 'Grenades: 3 damage in a 3x3 area. Wrecks cover.', grenades: 2 },
-  lin:    { name: 'Spc. Lin',    short: 'LIN',    img: 'sniper',    hp: 5, mv: 4, aim: 88, dmg: [4, 5], range: 12, shots: 1, gun: 'sniper', voice: 'karen',  shape: 3, rank: 1, color: '#5ad8ff', role: 'Sniper', perk: 'Steady: -25 aim if she moved this turn.' },
-  vance:  { name: 'Pvt. Vance',  short: 'VANCE',  img: 'radio',     hp: 6, mv: 5, aim: 68, dmg: [1, 2], range: 5,  shots: 2, gun: 'mg',     voice: 'alex',   shape: 1, rank: 0, color: '#c58bff', role: 'Radio Operator', perk: 'Artillery: 6 damage in 3x3, lands next turn.', arty: 1 },
-};
-const ENEMY_DEFS = {
-  spider:    { name: 'Spider',  img: 'spider', hp: 4, mv: 5, aim: 72, dmg: [2, 3], range: 1, melee: true, desc: 'Fast. Claws at close range.' },
-  scarab:    { name: 'Scarab',  img: 'scarab', hp: 6, mv: 3, aim: 60, dmg: [2, 2], range: 6, desc: 'Armoured plasma gunner.' },
-  hornet:    { name: 'Hornet',  img: 'hornet', hp: 4, mv: 6, aim: 55, dmg: [2, 2], range: 5, fly: true, big: false, desc: 'Flies over obstacles.' },
-  wasp:      { name: 'Wasp',    img: 'wasp',   hp: 1, mv: 7, aim: 75, dmg: [1, 1], range: 1, melee: true, fly: true, desc: 'Tiny, fast, fragile.' },
-  centipede: { name: 'Burrower', img: 'centipede', hp: 22, mv: 4, aim: 90, dmg: [4, 4], range: 1, melee: true, desc: 'Crushes cover in its path.', boss: true },
-};
-
-// ---------- progression: scrap + upgrades, saved on this device ----------
-const UPGRADES = [
-  { id: 'hp', label: 'HEALTH', max: 3, cost: [15, 30, 50] },
-  { id: 'dmg', label: 'DAMAGE', max: 3, cost: [20, 40, 65] },
-  { id: 'mv', label: 'MOVE', max: 2, cost: [25, 50] },
-  { id: 'aim', label: 'AIM', max: 3, cost: [15, 30, 50] },
-];
-const Save = {
-  data: null,
-  blank() { const up = {}; for (const k of Object.keys(SQUAD_DEFS)) up[k] = { hp: 0, dmg: 0, mv: 0, aim: 0 }; return { v: 1, scrap: 0, runs: 0, wins: 0, up }; },
-  load() {
-    let d = null;
-    try { d = JSON.parse(localStorage.getItem('robotwarfare.save') || 'null'); } catch (e) {}
-    this.data = this.blank();
-    if (d && d.up) { this.data.scrap = d.scrap | 0; this.data.runs = d.runs | 0; this.data.wins = d.wins | 0; for (const k in this.data.up) Object.assign(this.data.up[k], d.up[k] || {}); }
-  },
-  write() { try { localStorage.setItem('robotwarfare.save', JSON.stringify(this.data)); } catch (e) {} },
-  reset() { this.data = this.blank(); this.write(); },
-};
-Save.load();
-// a soldier's stats with upgrades applied. Gunners (multi-round weapons) get extra rounds instead of damage.
-function statsFor(id) {
-  const d = SQUAD_DEFS[id], L = Save.data.up[id];
-  const s = { ...d, dmg: d.dmg.slice() };
-  s.hp = d.hp + L.hp; s.mv = d.mv + L.mv; s.aim = d.aim + L.aim * 5;
-  if (d.shots >= 4) s.shots = d.shots + L.dmg; else { s.dmg[0] += L.dmg; s.dmg[1] += L.dmg; }
-  return s;
-}
-function statText(s, id) {
-  if (id === 'hp') return String(s.hp);
-  if (id === 'mv') return String(s.mv);
-  if (id === 'aim') return String(s.aim);
-  return s.shots >= 4 ? s.shots + 'x' + s.dmg[0] : s.dmg[0] + (s.dmg[1] > s.dmg[0] ? '-' + s.dmg[1] : '') + (s.shots > 1 ? ' x' + s.shots : '');
-}
 
 const units = [];
+
 let uid = 0;
+
 function makeSoldier(id, x, y) {
   const d = statsFor(id);
   const u = { id: uid++, key: id, side: 'player', ...d, maxhp: d.hp, x, y, ox: 0, oy: 0, flip: false, alive: true,
     moved: false, acted: false, overwatch: false, anim: { name: 'idle', t: Math.random() }, kills: 0, extracted: false };
   units.push(u); return u;
 }
+
 function makeEnemy(type, x, y, pod) {
   const d = ENEMY_DEFS[type];
   const u = { id: uid++, key: type, side: 'enemy', ...d, maxhp: d.hp, x, y, ox: 0, oy: 0, flip: true, alive: true, pod,
     active: false, anim: { name: 'idle', t: Math.random() }, alpha: 1 };
-  if (type === 'centipede') { u.segs = []; for (let i = 0; i < 6; i++) u.segs.push({ x, y, dir: 4 }); u.big = true; }
+  if (d.segs) { u.segN = d.segs; u.segs = []; for (let i = 0; i < d.segs; i++) u.segs.push({ x, y, dir: 4 }); u.big = true; }
   units.push(u); return u;
 }
+
 function unitAt(x, y) {
   for (const u of units) {
     if (!u.alive || u.extracted) continue;
@@ -78,6 +30,7 @@ function unitAt(x, y) {
   }
   return null;
 }
+
 function setAnim(u, name) { if (u.anim.name !== name) u.anim = { name, t: 0 }; }
 
 function unitFrame(u) {
@@ -95,10 +48,13 @@ function unitFrame(u) {
   f = (a.name === 'idle' || a.name === 'walk') ? f % n : Math.min(f, n - 1);
   return [f * 16, row * 16, 16, 16];
 }
+
 function unitPx(u) { return [u.x * TS + u.ox, u.y * TS + u.oy]; }
 
 // centipede: head rows 0-7, tail rows 8-15 (dir order E,NE,N,NW,W,SW,S,SE), body row 16
+
 const DIR4 = { '1,0': 0, '0,-1': 2, '-1,0': 4, '0,1': 6 };
+
 function drawCentipede(u, sx, sy) {
   const t = Math.floor(u.anim.t * 8) % 4;
   const seen = new Set();
@@ -125,18 +81,24 @@ function drawUnit(u, sx, sy) {
   } else spr(img, fr[0], fr[1], fr[2], fr[3], dx, dy, u.flip, u.alpha);
 }
 
-// ---------- effects ----------
 const FX = [];      // sprite animations
+
 const PROJ = [];    // projectiles
+
 const FLOAT = [];   // floating text
+
 const PARTS = [];   // particles
+
 const FXDEF = {
   bigexp: ['bigexp', 32, 11, 18], smallexp: ['smallexp', 24, 9, 18], bigfrag: ['bigfrag', 32, 6, 14], smallfrag: ['smallfrag', 24, 6, 14],
   impact: ['impact', 8, 5, 20], sparks: ['sparks', 8, 6, 22], spatter: ['spatter', 8, 6, 18], laser: ['laser', 16, 3, 18],
   muzzle: ['muzzle', 8, 4, 30], smoke: ['smoke', 8, 8, 10],
 };
+
 const LIGHTS = [];  // short-lived dynamic lights (muzzle flashes, explosions)
+
 function light(x, y, r, life, color) { LIGHTS.push({ x, y, r, life, t: 0, color }); }
+
 function fx(kind, x, y, opts = {}) {
   const [img, fw, n, fps] = FXDEF[kind];
   if (kind === 'muzzle') light(x, y, 30, 0.12, '255,210,120');
@@ -145,10 +107,13 @@ function fx(kind, x, y, opts = {}) {
   else if (kind === 'bigexp') light(x, y, 90, 0.6, '255,170,70');
   FX.push({ img, fw, n, fps, x, y, t: 0, flip: opts.flip, delay: opts.delay || 0, row: opts.row || 0, off: opts.off || 0, alpha: opts.alpha, scale: opts.scale || 1 });
 }
+
 function floatText(s, x, y, color = C.white, big) { FLOAT.push({ s, x, y, t: 0, color, big }); }
+
 function particles(x, y, n, color, spd = 40, life = 0.6) {
   for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, v = spd * (0.3 + Math.random()); PARTS.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 20, t: 0, life: life * (0.6 + Math.random() * 0.8), color }); }
 }
+
 function updateFX(dt) {
   for (let i = FX.length - 1; i >= 0; i--) { const e = FX[i]; if (e.delay > 0) { e.delay -= dt; continue; } e.t += dt; if (e.t * e.fps >= e.n) FX.splice(i, 1); }
   for (let i = FLOAT.length - 1; i >= 0; i--) { const f = FLOAT[i]; f.t += dt; if (f.t > 1.3) FLOAT.splice(i, 1); }
@@ -161,6 +126,7 @@ function updateFX(dt) {
     if (k >= 1) { PROJ.splice(i, 1); p.done && p.done(); }
   }
 }
+
 function drawFX(sx, sy) {
   for (const p of PARTS) { ctx.fillStyle = p.color; ctx.globalAlpha = 1 - p.t / p.life; ctx.fillRect(Math.round(p.x - sx), Math.round(p.y - sy), 1, 1); }
   ctx.globalAlpha = 1;
@@ -173,6 +139,12 @@ function drawFX(sx, sy) {
   }
   for (const p of PROJ) {
     if (p.kind === 'grenade') spr(I.grenade, (Math.floor(p.t * 20) % 8) * 8, 0, 8, 8, p.x - sx - 4, p.y - sy - 4);
+    else if (p.kind === 'rpg') {
+      // pack RPG round, rotated to its flight path
+      ctx.save(); ctx.translate(Math.round(p.x - sx), Math.round(p.y - sy)); ctx.rotate(Math.atan2(p.y1 - p.y0, p.x1 - p.x0));
+      ctx.drawImage(I.rpg, (Math.floor(p.t * 16) % 3) * 16, 0, 16, 16, -8, -8, 16, 16); ctx.restore();
+      if (Math.random() < 0.6) fx('smoke', p.x, p.y);
+    }
     else if (p.kind === 'shell') { ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(p.x - sx) - 1, Math.round(p.y - sy) - 3, 2, 6); }
     else {
       const fr = p.kind === 'plasma' ? 2 : 0;
@@ -190,6 +162,7 @@ function drawFX(sx, sy) {
     else textC(f.s, f.x - sx, y, f.color);
   }
 }
+
 function projectile(kind, x0, y0, x1, y1, speed = 380, arc = 0) {
   return new Promise(res => {
     const d = Math.hypot(x1 - x0, y1 - y0);

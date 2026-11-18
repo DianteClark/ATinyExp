@@ -24,7 +24,7 @@ sprites = {
   'obj': 'Obstacles and Objects/obstacles-and-objects.png',
   'leader': 'Soldiers/SquadLeader.png', 'gunner': 'Soldiers/MachineGunner-Class.png',
   'grenadier': 'Soldiers/Grenadier-Class.png', 'sniper': 'Soldiers/Sniper-Class.png',
-  'radio': 'Soldiers/RadioOperator-Class.png', 'assault': 'Soldiers/Assault-Class.png',
+  'radio': 'Soldiers/RadioOperator-Class.png', 'antitank': 'Soldiers/AntiTank-Class.png',
   'spider': 'Robots/Spider.png', 'scarab': 'Robots/Scarab.png', 'hornet': 'Robots/Hornet.png',
   'wasp': 'Robots/Wasp.png', 'centipede': 'Robots/Centipede.png',
   'bigexp': 'Effects/big-explosion.png', 'bigfrag': 'Effects/big-fragments.png',
@@ -32,12 +32,12 @@ sprites = {
   'spatter': 'Effects/hit-spatters.png', 'laser': 'Effects/laser-flash.png',
   'muzzle': 'Effects/muzzle-flashes.png', 'smallexp': 'Effects/small-explosion.png',
   'smallfrag': 'Effects/small-fragments.png', 'smoke': 'Effects/smoke.png',
-  'grenade': 'Projectiles/Grenade.png', 'bullets': 'Projectiles/bullets+plasma.png',
+  'grenade': 'Projectiles/Grenade.png', 'bullets': 'Projectiles/bullets+plasma.png', 'rpg': 'Projectiles/RPG-round.png',
   'rangegrid': 'UI/range-grid.png', 'selcircle': 'UI/selection-circles.png',
-  'selcursor': 'UI/selection-cursor.png', 'tgtcursor': 'UI/target-cursor.png',
+  'selcursor': 'UI/selection-cursor.png',
   'flag': 'UI/objective-flag.png', 'pulse': 'UI/objective-pulse.png',
   'icons': 'UI/icon-set.png', 'insignia': 'UI/squad-insignia.png',
-  'terrain': 'UI/terrain-icons.png', 'numbers': 'UI/numbers.png',
+  'numbers': 'UI/numbers.png',
   'arrows': 'UI/solid-arrows-thick.png', 'pointer': 'UI/mouse-pointer.png',
   'overheadbars': 'UI/overhead-health-bars.png', 'healthbars': 'UI/health-bars.png',
 }
@@ -131,7 +131,10 @@ def inst_class(ch, prog):
     return 4
 tracks = {'brief': '20. Military Base MIDI.mid', 'explore': '25. Dark Factory MIDI.mid',
           'battle': '01. Battle Theme MIDI.mid', 'boss': '27. The Evil One MIDI.mid',
-          'title': '21. Malicious Scheme MIDI.mid'}
+          'title': '21. Malicious Scheme MIDI.mid',
+          'explore2': '11. Dangerous Cave MIDI.mid', 'battle2': '09. Battle Theme II MIDI.mid', 'boss2': '15. Volcanic Crater.mid',
+          'explore3': '26. Demon King Castle MIDI.mid', 'battle3': '16. Battle Theme III MIDI.mid', 'boss3': '24. Battle Theme IV MIDI.mid',
+          'ending': '28. Holy Sanctuary MIDI.mid'}
 for key, fn in tracks.items():
     m = mido.MidiFile(MID + fn)
     t = 0.0; prog = {}; on = {}; notes = []

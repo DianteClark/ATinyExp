@@ -11,7 +11,6 @@ let VW = 240, VH = 480;             // HUD size in HUD pixels
 let WVW = 160, WVH = 320;           // map viewport size in world pixels
 let HS = 3, WS = 4, DPR = 1, SCALE = 1; // SCALE = CSS px per HUD pixel (input mapping)
 let ZMIN = 2, ZMAX = 12;
-let TALL = true;                    // the game is portrait-only
 let ROTATE = false;                 // phone held sideways -> show "turn your phone" screen
 const COARSE = window.matchMedia && matchMedia('(pointer: coarse)').matches;
 let zoomInit = false;
@@ -127,16 +126,6 @@ function bar(x, y, w, h, frac, col = C.green, back = '#3a0d14') {
   ctx.fillStyle = back; ctx.fillRect(x, y, w, h);
   ctx.fillStyle = col; ctx.fillRect(x, y, Math.round(w * Math.max(0, Math.min(1, frac))), h);
 }
-// pip health bar like Into-the-Breach
-function pips(x, y, hp, max, col = C.green) {
-  const w = max * 3 + 1;
-  x = Math.round(x - w / 2); y = Math.round(y);
-  ctx.fillStyle = C.ink; ctx.fillRect(x - 1, y - 1, w + 2, 5);
-  for (let i = 0; i < max; i++) {
-    ctx.fillStyle = i < hp ? col : '#4a1020';
-    ctx.fillRect(x + 1 + i * 3, y, 2, 3);
-  }
-}
 
 // ---------- input ----------
 const mouse = { x: 0, y: 0, down: false, rdown: false, moved: false, inside: false, dragX: 0, dragY: 0, dragging: false };
@@ -202,7 +191,6 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 function pressed(code) { if (keys['_' + code]) { keys['_' + code] = false; return true; } return false; }
-function clearPressed() { for (const k in keys) if (k[0] === '_') keys[k] = false; }
 
 // ---------- camera ----------
 const cam = { x: 0, y: 0, follow: null, shake: 0, sx: 0, sy: 0 };
@@ -244,14 +232,14 @@ const Audio2 = {
     const g = this.ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(this.sfxGain); s.start(); return { s, g };
   },
   voiceBusy: 0,
-  voice(actor, line, force) {
+  voice(actor, line, force, rate = 1) {
     if (!this.ctx || this.muteAll) return;
     const now = this.ctx.currentTime;
     if (!force && now < this.voiceBusy) return;
     const list = (VOICE[actor] || {})[line]; if (!list) return;
     const k = list[Math.floor(Math.random() * list.length)];
-    const h = this.play(k, 0.9, 1, this.voxGain);
-    if (h) this.voiceBusy = now + h.s.buffer.duration + 0.15;
+    const h = this.play(k, 0.9, rate || 1, this.voxGain);
+    if (h) this.voiceBusy = now + h.s.buffer.duration / (rate || 1) + 0.15;
   },
   // synthesized gunshot layer (crisper than the muffled sample)
   gun(kind = 'rifle', vol = 1) {

@@ -1,6 +1,12 @@
-# Robot Warfare: Dead Signal
+# Robot Warfare
 
-A pocket squad-tactics game for your phone. Kestrel Squad drops into a city overrun by robot insects to find a missing radio operator, fight to a helipad, and hold it until the dropship arrives. Something big lives under the streets.
+A pocket squad-tactics game for your phone. Kestrel Squad drops into a city overrun by robot insects. Three missions take them from a lost radio operator to the machine that's running the swarm.
+
+| # | Mission | Objective |
+|---|---|---|
+| 1 | **Dead Signal** | Find the missing radio operator, Vance, fight to the helipad and hold it until extraction. |
+| 2 | **Under the Streets** | Plant charges on three burrow holes before the swarm floods out, survive what comes up, then reach the pad. |
+| 3 | **Kill Switch** | Keep Vance alive at the hive console while the uplink runs. The Queen comes in with the first wave. |
 
 <img src="icons/icon-192.png" width="96" alt="App icon">
 
@@ -21,10 +27,16 @@ The live link above is served by GitHub Pages from `main` (root folder). You can
 | Pan | Drag | Right-drag or WASD |
 | Zoom | Pinch, or the + / − buttons | Mouse wheel, + / − keys |
 | End turn | END button | END or Space |
+| Undo last move | UNDO button | Z |
+| Speed up enemy turn | Tap the screen | Click |
 
 Each soldier gets one move and one action per turn. Cover from cars, rocks and walls cuts enemy aim by 20 (half) or 40 (full). Overwatch fires at the first enemy that moves in range. Shoot fuel barrels to set them off.
 
 **Downed, not dead.** A soldier at 0 HP goes down and bleeds out after 3 turns. Move a squadmate next to them and tap the downed soldier to revive them with 3 HP; it costs that squadmate's action. Anyone still down when the dropship arrives is carried out.
+
+**Campaign and loadout.** Clearing a mission unlocks the next. Before deploying you see the map and pick your squad (some missions require certain soldiers). Each mission has medals for doing it well, worth bonus scrap. Cpl. Mercer, the anti-tank gunner, joins from mission 2: his rockets hit hard, splash nearby enemies and wreck cover.
+
+**Reading the board.** Hover or tap-preview an enemy to see its reach (orange outline) and your hit chance. A green arrow at the screen edge points to the current objective.
 
 **Scrap and upgrades.** Destroyed robots, supply caches (the bobbing **!** on the map) and finishing the mission earn scrap. Spend it in the **Barracks** (title screen or after a mission) on Health, Damage, Move and Aim for each soldier. The machine gunner's damage upgrades add rounds instead. Progress is saved in your browser.
 
@@ -36,10 +48,16 @@ manifest.webmanifest    install info: name, icons, portrait
 icons/                  app icon (512/192/180/64) + favicon
 src/                    game source
   core.js               canvas, scaling + zoom, input, audio, MIDI chiptune synth
-  map.js                map layout, tiles, line of sight, cover, pathfinding
-  units.js              soldier/robot stats, animation, effects, lights
-  game.js               turns, combat, enemy AI, mission script + dialogue
-  ui.js                 HUD, dialogue box, title/end screens, lighting, main loop
+  data.js               soldier/robot stats, upgrades, save data
+  map.js                map builder, tiles, line of sight, cover, pathfinding
+  units.js              unit sprites, animation, effects, lights
+  combat.js             shooting, explosions, rockets, enemy AI
+  game.js               turn flow, triggers, spawns, extraction, victory/defeat
+  missions.js           the three missions: maps, scripts, dialogue, medals
+  render.js             world drawing, overlays, weather, lighting
+  hud.js                HUD, buttons, dialogue box, objective arrow
+  screens.js            title, campaign, loadout, barracks, results, ending, credits
+  main.js               input routing, main loop, boot
 assets/                 processed art/audio the game ships with
 tools/
   prepare_assets.py     raw asset packs -> assets/ (trims + converts audio, converts MIDI)
@@ -62,7 +80,7 @@ Tests need `pip install playwright` and a Chrome binary:
 
 ```
 python3 tests/smoke.py /tmp/shots
-python3 tests/bot_run.py 25
+python3 tests/bot_run.py 25 2        # turns, mission (1-3), optional 'god'
 ```
 
 ## Credits
@@ -70,7 +88,7 @@ python3 tests/bot_run.py 25
 - **Pixel art:** [Robot Warfare Asset Pack](https://mattwalkden.itch.io/free-robot-warfare-pack) by Matt Walkden. CC0.
 - **Voices:** Super Dialogue Audio Pack v1 by Dillon Becker, performed by Ian Lampert, Sean Lenhart, Alex Brodie, Meghan Christian and Karen Cenon. Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The clips were trimmed and converted to MP3.
 - **Sound effects:** 400 Sounds Pack and 96 Extra SFX.
-- **Music:** MIDI tracks (Military Base, Dark Factory, Battle Theme, The Evil One, Malicious Scheme) played live through an in-browser chiptune synth.
+- **Music:** MIDI tracks (Military Base, Dark Factory, Battle Theme, The Evil One, Malicious Scheme, Dangerous Cave, Volcanic Crater, Demon King Castle, Holy Sanctuary and others) played live through an in-browser chiptune synth.
 - The bitmap font is Pillow's built-in bitmap font.
 
 The raw asset packs aren't committed because of their size. Only the trimmed files the game uses are in `assets/`.

@@ -10,7 +10,7 @@ VOICE = json.load(open(os.path.join(A, 'voice.json')))
 MUSIC = {f[:-5]: json.load(open(os.path.join(A, 'music', f))) for f in sorted(os.listdir(os.path.join(A, 'music'))) if f.endswith('.json')}
 
 js = 'const IMG=' + json.dumps(IMG) + ';\nconst AUD=' + json.dumps(AUD) + ';\nconst VOICE=' + json.dumps(VOICE) + ';\nconst MUSIC=' + json.dumps(MUSIC, separators=(',', ':')) + ';\n'
-for f in ['core.js', 'map.js', 'units.js', 'game.js', 'ui.js']:
+for f in ['core.js', 'data.js', 'map.js', 'units.js', 'combat.js', 'game.js', 'missions.js', 'render.js', 'hud.js', 'screens.js', 'main.js']:
     js += '\n// ---- ' + f + ' ----\n' + open(os.path.join(ROOT, 'src', f)).read()
 
 favicon = 'data:image/png;base64,' + b64(os.path.join(ROOT, 'icons', 'favicon-32.png'))

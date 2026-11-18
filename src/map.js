@@ -39,65 +39,46 @@ const OBJ = {
 };
 const objects = [];
 
-function buildMap() {
-  grid = []; deco = []; objAt = []; explored = [];
-  for (let y = 0; y < MH; y++) { grid.push(new Array(MW).fill(T.BAD)); deco.push(new Array(MW).fill(null)); objAt.push(new Array(MW).fill(null)); explored.push(new Array(MW).fill(false)); }
-  const fill = (t, x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) grid[y][x] = t; };
-  const walls = (x0, y0, x1, y1, gaps = []) => {
-    fill(T.FLOOR, x0 + 1, y0 + 1, x1 - 1, y1 - 1);
+// ---------- map builder: missions describe their layout with these calls ----------
+// tag[y][x] remembers how a tile should be drawn (which road lane, which parking bay, which pad corner)
+let tag = [], craters = [];
+const MapB = {
+  fill(t, x0, y0, x1, y1) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (inb(x, y)) { grid[y][x] = t; tag[y][x] = null; } },
+  // a walled building with a floor; gaps are [x, y] door/breach tiles
+  building(x0, y0, x1, y1, gaps = []) {
+    this.fill(T.FLOOR, x0 + 1, y0 + 1, x1 - 1, y1 - 1);
     for (let x = x0; x <= x1; x++) { grid[y0][x] = T.WALL; grid[y1][x] = T.WALL; }
     for (let y = y0; y <= y1; y++) { grid[y][x0] = T.WALL; grid[y][x1] = T.WALL; }
     for (const [gx, gy, t] of gaps) grid[gy][gx] = t === undefined ? T.FLOOR : t;
-  };
-  // city pavement west, ragged edge into badlands
-  fill(T.PAVE, 0, 0, 27, 25);
-  for (let y = 0; y < MH; y++) { const e = 28 + ((y * 7) % 3 === 0 ? 1 : 0) - ((y * 5) % 4 === 0 ? 1 : 0); fill(T.DIRT, e, y, e + 1, y); }
-  // roads
-  fill(T.ROAD, 0, 14, 31, 15);
-  fill(T.ROAD, 18, 0, 19, 25);
-  // Halvorsen office (Vance)
-  walls(3, 2, 14, 10, [[8, 10], [9, 10], [14, 7]]);
-  for (let y = 3; y <= 7; y++) grid[y][10] = T.WALL; grid[5][10] = T.FLOOR;
-  // NE warehouse (ruined)
-  walls(21, 2, 27, 10, [[24, 10], [25, 10], [21, 5], [21, 6], [27, 7], [26, 2], [27, 2], [27, 3]]);
-  grid[2][26] = T.PAVE; grid[2][27] = T.PAVE; grid[3][27] = T.PAVE;
-  // south ruin (low walls)
-  walls(7, 19, 13, 23, [[10, 19], [11, 19], [7, 21], [13, 21], [13, 22], [9, 23], [10, 23]]);
-  // parking lot SE
-  fill(T.LOT, 21, 18, 27, 24);
-  // LZ helipad
-  fill(T.PAD, 33, 3, 36, 6);
-
-  // decor: craters + badlands variants
-  const rnd = mulberry(7);
+  },
+  wall(x0, y0, x1, y1) { this.fill(T.WALL, x0, y0, x1, y1); },
+  // two-lane roads: hroad rows y and y+1, vroad columns x and x+1
+  hroad(y, x0, x1) { for (let x = x0; x <= x1; x++) for (const [dy, lane] of [[0, 'top'], [1, 'bottom']]) this._road(x, y + dy, lane, 'h'); },
+  vroad(x, y0, y1) { for (let y = y0; y <= y1; y++) for (const [dx, lane] of [[0, 'left'], [1, 'right']]) this._road(x + dx, y, lane, 'v'); },
+  _road(x, y, lane, axis) {
+    if (!inb(x, y)) return;
+    const prev = grid[y][x] === T.ROAD && tag[y][x];
+    grid[y][x] = T.ROAD;
+    tag[y][x] = prev && prev.axis !== axis ? { lane: 'cross', axis: 'x' } : { lane, axis };
+  },
+  // parking lot: w x h tiles of asphalt with pack parking bays from (x0, y0)
+  lot(x0, y0, w, h) { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (inb(x, y)) { grid[y][x] = T.LOT; tag[y][x] = { lx: x - x0, ly: y - y0, w, h }; } },
+  // 4x4 circular pad / plaza (pack tiles)
+  pad(x0, y0) { for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { grid[y0 + y][x0 + x] = T.PAD; tag[y0 + y][x0 + x] = { px: x, py: y }; } },
+  crater(x, y, size) { craters.push([x, y, size]); },
+  obj(type, x, y) { return placeObj(type, x, y); },
+};
+function buildMap(mission) {
+  grid = []; deco = []; objAt = []; explored = []; tag = []; craters = []; objects.length = 0;
+  for (let y = 0; y < MH; y++) {
+    grid.push(new Array(MW).fill(T.BAD)); deco.push(new Array(MW).fill(0)); objAt.push(new Array(MW).fill(null));
+    explored.push(new Array(MW).fill(false)); tag.push(new Array(MW).fill(null));
+  }
+  const rnd = mulberry(mission.seed || 7);
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) deco[y][x] = Math.floor(rnd() * 1000);
-  craters = [[31, 9, 2], [36, 11, 3], [30, 19, 2], [37, 20, 1], [33, 16, 1], [38, 1, 1], [30, 2, 1], [35, 23, 2]];
-
-  // objects
-  const P = (type, x, y) => placeObj(type, x, y);
-  // start area / south
-  P('carBH', 2, 17); P('rock1', 5, 18); P('barrel', 15, 18); P('carRV', 16, 21); P('rock2', 3, 24);
-  P('lamp', 6, 16); P('lamp', 12, 16); P('lamp', 6, 13); P('lamp', 14, 13); P('lamp', 24, 13); P('lamp', 24, 16);
-  P('lamp', 17, 6); P('lamp', 20, 9); P('lamp', 17, 20); P('lamp', 20, 21);
-  P('junk', 9, 21); P('crate', 12, 20); P('debris2', 8, 20); P('debris1', 11, 22);
-  // main road
-  P('carRH', 4, 14); P('carBV', 13, 14); P('burntV', 22, 14); P('carRH', 25, 15); P('barrel1', 16, 13); P('barrel', 21, 16);
-  P('carBH', 9, 12); P('rock3', 1, 12); P('debris3', 11, 15); P('debris1', 17, 14);
-  // office interior
-  P('desk', 5, 5); P('cabinet', 7, 3); P('chair', 4, 7); P('desk', 12, 4); P('shelf', 13, 8); P('crate', 11, 8); P('junk', 5, 8); P('desk', 8, 7);
-  // north street
-  P('carRV', 16, 1); P('barrel', 20, 3); P('rock1', 1, 1); P('carBV', 1, 6);
-  // warehouse
-  P('crate', 23, 4); P('crate', 25, 6); P('junk', 22, 8); P('shelf', 26, 4); P('barrel', 24, 7); P('debris2', 26, 3);
-  // parking lot
-  P('carBV', 22, 19); P('carRV', 24, 19); P('carRHw', 22, 23); P('barrel', 26, 21); P('burntV2', 26, 18);
-  // badlands
-  P('rockW', 30, 5); P('rock2', 32, 8); P('rock1', 38, 4); P('rock3', 31, 13); P('rockW', 35, 8); P('rock2', 29, 17);
-  P('rock1', 34, 18); P('rock3', 37, 14); P('carBVw', 38, 9); P('barrel', 32, 2); P('rock2', 36, 1); P('spike', 33, 12);
-  P('rockW', 29, 23); P('rock1', 37, 24); P('carRVw', 30, 10);
+  mission.build(MapB);
   renderMapCanvas();
 }
-let craters = [];
 function inb(x, y) { return x >= 0 && y >= 0 && x < MW && y < MH; }
 function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
@@ -131,20 +112,19 @@ function renderMapCanvas() {
     else if (t === T.PAVE) { const v = (r % 100) < 70 ? PAVEV[r % 4] : PAVEV[4 + r % 9]; tA(v[0], v[1], x, y); }
     else if (t === T.FLOOR) { const v = FLOORV[r % FLOORV.length]; tA(v[0], v[1], x, y); }
     else if (t === T.ROAD) {
-      // pack road tiles: lanes with curb + dashed centre line, plain asphalt where the roads cross
-      const hz = y === 14 || y === 15, vt = x === 18 || x === 19;
-      if (hz && vt) tC(2, 7, x, y);
-      else if (hz) tC(y === 14 ? 10 : 11, 4, x, y);
-      else tC(x === 18 ? 12 : 13, 4, x, y);
+      // pack road tiles: lanes with curb + dashed centre line, plain asphalt where roads cross
+      const k = tag[y][x] || { lane: 'cross' };
+      const lane = { top: [10, 4], bottom: [11, 4], left: [12, 4], right: [13, 4], cross: [2, 7] }[k.lane];
+      tC(lane[0], lane[1], x, y);
     }
     else if (t === T.LOT) {
       // parking bays from the pack: 2x4 bays on top, 2x2 bays below, asphalt elsewhere
-      const lx = x - 21, ly = y - 18;
-      if (lx < 6 && ly < 4) tA(8 + (lx % 2), 5 + ly, x, y);
-      else if (lx < 6 && ly >= 4 && ly < 6) tA(10 + (lx % 2), 5 + (ly - 4), x, y);
+      const k = tag[y][x] || { lx: 99, ly: 99 }, lx = k.lx, ly = k.ly, bw = (k.w || 7) - ((k.w || 7) % 2);
+      if (lx < bw && ly < 4) tA(8 + (lx % 2), 5 + ly, x, y);
+      else if (lx < bw && ly >= 4 && ly < 6) tA(10 + (lx % 2), 5 + (ly - 4), x, y);
       else tC(2, 7, x, y);
     }
-    else if (t === T.PAD) { tA(4 + (x - 33), 5 + (y - 3), x, y); }
+    else if (t === T.PAD) { const k = tag[y][x] || { px: 0, py: 0 }; tA(4 + k.px, 5 + k.py, x, y); }
     else if (t === T.WALL) { // floor under, then autotiled wall
       tA(13, 0, x, y);
       const m = (isT(x, y - 1, T.WALL) ? 1 : 0) | (isT(x + 1, y, T.WALL) ? 2 : 0) | (isT(x, y + 1, T.WALL) ? 4 : 0) | (isT(x - 1, y, T.WALL) ? 8 : 0);
