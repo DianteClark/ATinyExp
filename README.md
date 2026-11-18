@@ -4,11 +4,13 @@ A pocket squad-tactics game for your phone. Kestrel Squad drops into a city over
 
 <img src="icons/icon-192.png" width="96" alt="App icon">
 
+### ▶ [Play now: dianteclark.github.io/ATinyExp](https://dianteclark.github.io/ATinyExp/)
+
+Best on a phone held upright. Use **Add to Home Screen** to install it with the app icon.
+
 ## Play
 
-Open `index.html` in a browser. It's one self-contained file and works offline.
-
-To host it, turn on **GitHub Pages** for this repo (Settings → Pages → deploy from `main`, root). On a phone you can then use "Add to Home Screen" to install it with the app icon. It plays in portrait, and turning the phone sideways shows a "turn your phone upright" screen.
+The live link above is served by GitHub Pages from `main` (root folder). You can also open `index.html` directly in a browser: it's one self-contained file and works offline. It plays in portrait, and turning the phone sideways shows a "turn your phone upright" screen.
 
 ### Controls
 
