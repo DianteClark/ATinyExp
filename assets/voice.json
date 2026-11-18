@@ -1,0 +1,272 @@
+{
+ "meghan": {
+  "sel": [
+   "v_meghan_sel_1",
+   "v_meghan_sel_2",
+   "v_meghan_sel_3"
+  ],
+  "go": [
+   "v_meghan_go_4",
+   "v_meghan_go_5",
+   "v_meghan_go_7",
+   "v_meghan_go_10"
+  ],
+  "no": [
+   "v_meghan_no_5",
+   "v_meghan_no_6"
+  ],
+  "spot": [
+   "v_meghan_spot_7"
+  ],
+  "attacked": [
+   "v_meghan_attacked_6"
+  ],
+  "low": [
+   "v_meghan_low_5"
+  ],
+  "ready": [
+   "v_meghan_ready_8"
+  ],
+  "count": [
+   "v_meghan_count_9"
+  ],
+  "dmg": [
+   "v_meghan_dmg_1",
+   "v_meghan_dmg_2",
+   "v_meghan_dmg_3",
+   "v_meghan_dmg_4",
+   "v_meghan_dmg_5"
+  ],
+  "death": [
+   "v_meghan_death_1",
+   "v_meghan_death_2"
+  ],
+  "grunt": [
+   "v_meghan_grunt_1",
+   "v_meghan_grunt_2",
+   "v_meghan_grunt_3"
+  ],
+  "obj": [
+   "v_meghan_obj_8"
+  ],
+  "luck": [
+   "v_meghan_luck_9"
+  ]
+ },
+ "ian": {
+  "sel": [
+   "v_ian_sel_1",
+   "v_ian_sel_2",
+   "v_ian_sel_3"
+  ],
+  "go": [
+   "v_ian_go_4",
+   "v_ian_go_5",
+   "v_ian_go_7",
+   "v_ian_go_10"
+  ],
+  "no": [
+   "v_ian_no_5",
+   "v_ian_no_6"
+  ],
+  "spot": [
+   "v_ian_spot_7"
+  ],
+  "attacked": [
+   "v_ian_attacked_6"
+  ],
+  "low": [
+   "v_ian_low_5"
+  ],
+  "ready": [
+   "v_ian_ready_8"
+  ],
+  "count": [
+   "v_ian_count_9"
+  ],
+  "dmg": [
+   "v_ian_dmg_1",
+   "v_ian_dmg_2",
+   "v_ian_dmg_3",
+   "v_ian_dmg_4",
+   "v_ian_dmg_5"
+  ],
+  "death": [
+   "v_ian_death_1",
+   "v_ian_death_2"
+  ],
+  "grunt": [
+   "v_ian_grunt_1",
+   "v_ian_grunt_2",
+   "v_ian_grunt_3"
+  ],
+  "obj": [
+   "v_ian_obj_8"
+  ],
+  "luck": [
+   "v_ian_luck_9"
+  ]
+ },
+ "sean": {
+  "sel": [
+   "v_sean_sel_1",
+   "v_sean_sel_2",
+   "v_sean_sel_3"
+  ],
+  "go": [
+   "v_sean_go_4",
+   "v_sean_go_5",
+   "v_sean_go_7",
+   "v_sean_go_10"
+  ],
+  "no": [
+   "v_sean_no_5",
+   "v_sean_no_6"
+  ],
+  "spot": [
+   "v_sean_spot_7"
+  ],
+  "attacked": [
+   "v_sean_attacked_6"
+  ],
+  "low": [
+   "v_sean_low_5"
+  ],
+  "ready": [
+   "v_sean_ready_8"
+  ],
+  "count": [
+   "v_sean_count_9"
+  ],
+  "dmg": [
+   "v_sean_dmg_1",
+   "v_sean_dmg_2",
+   "v_sean_dmg_3",
+   "v_sean_dmg_4",
+   "v_sean_dmg_5"
+  ],
+  "death": [
+   "v_sean_death_1",
+   "v_sean_death_2"
+  ],
+  "grunt": [
+   "v_sean_grunt_1",
+   "v_sean_grunt_2",
+   "v_sean_grunt_3"
+  ],
+  "obj": [
+   "v_sean_obj_8"
+  ],
+  "luck": [
+   "v_sean_luck_9"
+  ]
+ },
+ "karen": {
+  "sel": [
+   "v_karen_sel_1",
+   "v_karen_sel_2",
+   "v_karen_sel_3"
+  ],
+  "go": [
+   "v_karen_go_4",
+   "v_karen_go_5",
+   "v_karen_go_7",
+   "v_karen_go_10"
+  ],
+  "no": [
+   "v_karen_no_5",
+   "v_karen_no_6"
+  ],
+  "spot": [
+   "v_karen_spot_7"
+  ],
+  "attacked": [
+   "v_karen_attacked_6"
+  ],
+  "low": [
+   "v_karen_low_5"
+  ],
+  "ready": [
+   "v_karen_ready_8"
+  ],
+  "count": [
+   "v_karen_count_9"
+  ],
+  "dmg": [
+   "v_karen_dmg_1",
+   "v_karen_dmg_2",
+   "v_karen_dmg_3",
+   "v_karen_dmg_4",
+   "v_karen_dmg_5"
+  ],
+  "death": [
+   "v_karen_death_1",
+   "v_karen_death_2"
+  ],
+  "grunt": [
+   "v_karen_grunt_1",
+   "v_karen_grunt_2",
+   "v_karen_grunt_3"
+  ],
+  "obj": [
+   "v_karen_obj_8"
+  ],
+  "luck": [
+   "v_karen_luck_9"
+  ]
+ },
+ "alex": {
+  "sel": [
+   "v_alex_sel_1",
+   "v_alex_sel_2",
+   "v_alex_sel_3"
+  ],
+  "go": [
+   "v_alex_go_4",
+   "v_alex_go_5",
+   "v_alex_go_7",
+   "v_alex_go_10"
+  ],
+  "no": [
+   "v_alex_no_5",
+   "v_alex_no_6"
+  ],
+  "spot": [
+   "v_alex_spot_7"
+  ],
+  "attacked": [
+   "v_alex_attacked_6"
+  ],
+  "low": [
+   "v_alex_low_5"
+  ],
+  "ready": [
+   "v_alex_ready_8"
+  ],
+  "count": [
+   "v_alex_count_9"
+  ],
+  "dmg": [
+   "v_alex_dmg_1",
+   "v_alex_dmg_2",
+   "v_alex_dmg_3",
+   "v_alex_dmg_4",
+   "v_alex_dmg_5"
+  ],
+  "death": [
+   "v_alex_death_1",
+   "v_alex_death_2"
+  ],
+  "grunt": [
+   "v_alex_grunt_1",
+   "v_alex_grunt_2",
+   "v_alex_grunt_3"
+  ],
+  "obj": [
+   "v_alex_obj_8"
+  ],
+  "luck": [
+   "v_alex_luck_9"
+  ]
+ }
+}
