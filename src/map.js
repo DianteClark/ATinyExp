@@ -25,6 +25,7 @@ const OBJ = {
   debris2:{ r: [117, 84, 10, 11], ax: 5, ay: 8, cover: 0, block: false },
   debris3:{ r: [132, 85, 6, 5], ax: 3, ay: 3, cover: 0, block: false },
   spike:  { r: [45, 36, 6, 8], ax: 3, ay: 7, cover: 0, block: false },
+  cache:  { r: [65, 80, 14, 14], ax: 7, ay: 13, cover: 0, block: false },
   carRH:  { r: [4, 135, 24, 17], ax: 4, ay: 15, cover: 2, block: true, w: 2, wreck: 'carRHw' },
   carBH:  { r: [132, 135, 24, 17], ax: 4, ay: 15, cover: 2, block: true, w: 2, wreck: 'carBHw' },
   carRV:  { r: [70, 134, 19, 21], ax: 9, ay: 19, cover: 2, block: true, h: 2, wreck: 'carRVw' },
@@ -129,10 +130,19 @@ function renderMapCanvas() {
     else if (t === T.DIRT) { const v = DIRTV[r % DIRTV.length]; tA(v[0], v[1], x, y); }
     else if (t === T.PAVE) { const v = (r % 100) < 70 ? PAVEV[r % 4] : PAVEV[4 + r % 9]; tA(v[0], v[1], x, y); }
     else if (t === T.FLOOR) { const v = FLOORV[r % FLOORV.length]; tA(v[0], v[1], x, y); }
-    else if (t === T.ROAD || t === T.LOT) {
-      g.fillStyle = '#10183f'; g.fillRect(x * 16, y * 16, 16, 16);
-      g.fillStyle = '#0c1233';
-      for (let i = 0; i < 5; i++) { const q = (r * (i + 3) * 7919) % 256; g.fillRect(x * 16 + (q % 16), y * 16 + (q >> 4), 1 + (i % 2), 1); }
+    else if (t === T.ROAD) {
+      // pack road tiles: lanes with curb + dashed centre line, plain asphalt where the roads cross
+      const hz = y === 14 || y === 15, vt = x === 18 || x === 19;
+      if (hz && vt) tC(2, 7, x, y);
+      else if (hz) tC(y === 14 ? 10 : 11, 4, x, y);
+      else tC(x === 18 ? 12 : 13, 4, x, y);
+    }
+    else if (t === T.LOT) {
+      // parking bays from the pack: 2x4 bays on top, 2x2 bays below, asphalt elsewhere
+      const lx = x - 21, ly = y - 18;
+      if (lx < 6 && ly < 4) tA(8 + (lx % 2), 5 + ly, x, y);
+      else if (lx < 6 && ly >= 4 && ly < 6) tA(10 + (lx % 2), 5 + (ly - 4), x, y);
+      else tC(2, 7, x, y);
     }
     else if (t === T.PAD) { tA(4 + (x - 33), 5 + (y - 3), x, y); }
     else if (t === T.WALL) { // floor under, then autotiled wall
@@ -147,32 +157,10 @@ function renderMapCanvas() {
     else if (s === 2) for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) tA(9 + dx, 9 + dy, cx + dx, cy + dy);
     else for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) tA(11 + dx, 9 + dy, cx + dx, cy + dy);
   }
-  // road markings + curbs
-  g.fillStyle = '#0f8892';
-  for (let x = 0; x < MW; x++) if (isT(x, 14, T.ROAD) && isT(x, 15, T.ROAD) && !(x >= 17 && x <= 20)) { g.fillRect(x * 16 + 2, 15 * 16 - 1, 6, 2); g.fillRect(x * 16 + 10, 15 * 16 - 1, 4, 2); }
-  for (let y = 0; y < MH; y++) if (isT(18, y, T.ROAD) && isT(19, y, T.ROAD) && !(y >= 13 && y <= 16)) { g.fillRect(19 * 16 - 1, y * 16 + 2, 2, 6); g.fillRect(19 * 16 - 1, y * 16 + 10, 2, 4); }
-  // crosswalk stripes
-  g.fillStyle = 'rgba(160,200,210,0.35)';
-  for (let i = 0; i < 4; i++) { g.fillRect(16 * 16 + 4 + i * 0, 14 * 16 + 2 + i * 8, 1, 1); }
-  for (const yy of [14, 15]) for (const xx of [17, 20]) if (isT(xx, yy, T.ROAD)) for (let i = 0; i < 4; i++) g.fillRect(xx * 16 + 2 + i * 4, yy * 16 + 2, 2, 12);
-  for (const xx of [18, 19]) for (const yy of [13, 16]) if (isT(xx, yy, T.ROAD)) for (let i = 0; i < 4; i++) g.fillRect(xx * 16 + 2, yy * 16 + 2 + i * 4, 12, 2);
-  // parking bays
-  g.fillStyle = '#0f8892';
-  for (let x = 21; x <= 27; x += 2) { g.fillRect(x * 16, 18 * 16 + 2, 1, 28); g.fillRect(x * 16, 23 * 16 + 2, 1, 28); }
-  // curbs: pavement edge against road/lot
-  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-    const t = grid[y][x]; if (t !== T.ROAD && t !== T.LOT) continue;
-    const px = x * 16, py = y * 16;
-    const side = (nx, ny) => { const nt = inb(nx, ny) ? grid[ny][nx] : -1; return nt === T.PAVE || nt === T.FLOOR || nt === T.WALL; };
-    if (side(x, y - 1)) { g.fillStyle = '#15c6a6'; g.fillRect(px, py, 16, 1); g.fillStyle = '#06226d'; g.fillRect(px, py + 1, 16, 2); }
-    if (side(x, y + 1)) { g.fillStyle = '#1f6363'; g.fillRect(px, py + 14, 16, 2); g.fillStyle = '#15c6a6'; g.fillRect(px, py + 13, 16, 1); }
-    if (side(x - 1, y)) { g.fillStyle = '#15c6a6'; g.fillRect(px, py, 1, 16); g.fillStyle = '#06226d'; g.fillRect(px + 1, py, 1, 16); }
-    if (side(x + 1, y)) { g.fillStyle = '#1f6363'; g.fillRect(px + 15, py, 1, 16); g.fillStyle = '#15c6a6'; g.fillRect(px + 14, py, 1, 16); }
-  }
 }
 
 // ---------- queries ----------
-function walkable(x, y) { return inb(x, y) && grid[y][x] !== T.WALL && !objAt[y][x]; }
+function walkable(x, y) { return inb(x, y) && grid[y][x] !== T.WALL && (!objAt[y][x] || !OBJ[objAt[y][x].type].block); }
 function flyable(x, y) { return inb(x, y); }
 function blocksLOS(x, y) { return !inb(x, y) || grid[y][x] === T.WALL; }
 // supercover line LOS between tile centers
@@ -241,7 +229,7 @@ function reach(unit, range, opts = {}) {
     }
   }
   // remove occupied end tiles
-  for (const [k, v] of res) { const u = unitAt(v.x, v.y); if (u && u !== unit) v.occupied = true; if (!fly ? false : (grid[v.y][v.x] === T.WALL || objAt[v.y][v.x])) v.occupied = true; }
+  for (const [k, v] of res) { const u = unitAt(v.x, v.y); if (u && u !== unit) v.occupied = true; if (fly && (grid[v.y][v.x] === T.WALL || (objAt[v.y][v.x] && OBJ[objAt[v.y][v.x].type].block))) v.occupied = true; }
   return res;
 }
 function pathTo(node) { const p = []; while (node) { p.unshift({ x: node.x, y: node.y }); node = node.prev; } return p; }

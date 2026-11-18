@@ -14,7 +14,9 @@ async def phone(b):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_timeout(900)
     await pg.screenshot(path=f'{OUT}/p_title.png')
-    await pg.touchscreen.tap(195, 422); await pg.wait_for_timeout(2600)
+    await pg.touchscreen.tap(195, 300); await pg.wait_for_timeout(300)   # first tap unlocks audio
+    dep = await pg.evaluate("(() => { const b = hud.find(h => h.id === 'deploy'); return [(b.x + b.w / 2) * SCALE, (b.y + b.h / 2) * SCALE]; })()")
+    await pg.touchscreen.tap(*dep); await pg.wait_for_timeout(5200)
     await pg.screenshot(path=f'{OUT}/p_dialog.png')
     sk = await pg.evaluate("(() => { const b = hud.find(h => h.id === 'skip'); return [(b.x + 5) * SCALE, (b.y + 5) * SCALE]; })()")
     await pg.touchscreen.tap(*sk)
@@ -67,7 +69,7 @@ async def desktop(b):
     pg = await b.new_page(viewport={'width': 1280, 'height': 720}); errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_timeout(900)
-    await pg.mouse.click(640, 360); await pg.wait_for_timeout(500)
+    await pg.keyboard.press('Enter'); await pg.wait_for_timeout(500)
     await pg.keyboard.press('Escape'); await pg.evaluate("window.__speed = 5"); await pg.wait_for_timeout(1500); await pg.evaluate("window.__speed = 1"); await pg.wait_for_timeout(1200)
     await pg.mouse.move(640, 300)
     await pg.screenshot(path=f'{OUT}/d_play.png')

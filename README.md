@@ -24,6 +24,10 @@ The live link above is served by GitHub Pages from `main` (root folder). You can
 
 Each soldier gets one move and one action per turn. Cover from cars, rocks and walls cuts enemy aim by 20 (half) or 40 (full). Overwatch fires at the first enemy that moves in range. Shoot fuel barrels to set them off.
 
+**Downed, not dead.** A soldier at 0 HP goes down and bleeds out after 3 turns. Move a squadmate next to them and tap the downed soldier to revive them with 3 HP; it costs that squadmate's action. Anyone still down when the dropship arrives is carried out.
+
+**Scrap and upgrades.** Destroyed robots, supply caches (the bobbing **!** on the map) and finishing the mission earn scrap. Spend it in the **Barracks** (title screen or after a mission) on Health, Damage, Move and Aim for each soldier. The machine gunner's damage upgrades add rounds instead. Progress is saved in your browser.
+
 ## Project layout
 
 ```

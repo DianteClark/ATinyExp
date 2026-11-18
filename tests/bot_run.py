@@ -12,7 +12,8 @@ async def main():
         pg.on('pageerror', lambda e: errs.append(str(e)))
         await pg.goto('file://' + os.path.join(ROOT, 'index.html')); await pg.wait_for_timeout(800)
         await pg.evaluate('window.__speed = 6')
-        await pg.touchscreen.tap(195, 422); await pg.wait_for_timeout(500)
+        await pg.touchscreen.tap(195, 300); await pg.wait_for_timeout(300)
+        await pg.evaluate('startMission()'); await pg.wait_for_timeout(500)
         await pg.evaluate(open(os.path.join(ROOT, 'tests', 'bot.js')).read())
         await pg.evaluate(f"() => {{ __bot({TURNS}).then(r => window.__botR = r).catch(e => window.__botR = 'BOT ERROR ' + e); return 1; }}")
         for _ in range(150):

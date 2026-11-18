@@ -39,6 +39,7 @@ sprites = {
   'icons': 'UI/icon-set.png', 'insignia': 'UI/squad-insignia.png',
   'terrain': 'UI/terrain-icons.png', 'numbers': 'UI/numbers.png',
   'arrows': 'UI/solid-arrows-thick.png', 'pointer': 'UI/mouse-pointer.png',
+  'overheadbars': 'UI/overhead-health-bars.png', 'healthbars': 'UI/health-bars.png',
 }
 for k, v in sprites.items():
     shutil.copy(PACK + v, f'{A}/img/{k}.png')

@@ -7,7 +7,7 @@ const ROBOT_ROWS = { idle: [0, 2, 3], walk: [1, 4, 10], fire: [2, 2, 10], melee:
 
 const SQUAD_DEFS = {
   reyes:  { name: 'Sgt. Reyes',  short: 'REYES',  img: 'leader',    hp: 7, mv: 5, aim: 72, dmg: [2, 3], range: 7,  shots: 1, gun: 'rifle',  voice: 'meghan', shape: 4, rank: 2, color: '#ffd23f', role: 'Squad Leader', perk: 'Leadership: allies within 4 tiles get +10 aim.' },
-  okafor: { name: 'Cpl. Okafor', short: 'OKAFOR', img: 'gunner',    hp: 8, mv: 4, aim: 60, dmg: [1, 1], range: 6,  shots: 4, gun: 'mg',     voice: 'ian',    shape: 0, rank: 1, color: '#ff9a1a', role: 'Machine Gunner', perk: 'Burst: 4 rounds, 1 damage each.' },
+  okafor: { name: 'Cpl. Okafor', short: 'OKAFOR', img: 'gunner',    hp: 8, mv: 4, aim: 60, dmg: [1, 1], range: 6,  shots: 4, gun: 'mg',     voice: 'ian',    shape: 0, rank: 1, color: '#ff9a1a', role: 'Machine Gunner', perk: 'Burst: fires several 1-damage rounds. Damage upgrades add rounds.' },
   haas:   { name: 'Pvt. Haas',   short: 'HAAS',   img: 'grenadier', hp: 7, mv: 4, aim: 65, dmg: [2, 3], range: 6,  shots: 1, gun: 'rifle',  voice: 'sean',   shape: 2, rank: 1, color: '#3ee03e', role: 'Grenadier', perk: 'Grenades: 3 damage in a 3x3 area. Wrecks cover.', grenades: 2 },
   lin:    { name: 'Spc. Lin',    short: 'LIN',    img: 'sniper',    hp: 5, mv: 4, aim: 88, dmg: [4, 5], range: 12, shots: 1, gun: 'sniper', voice: 'karen',  shape: 3, rank: 1, color: '#5ad8ff', role: 'Sniper', perk: 'Steady: -25 aim if she moved this turn.' },
   vance:  { name: 'Pvt. Vance',  short: 'VANCE',  img: 'radio',     hp: 6, mv: 5, aim: 68, dmg: [1, 2], range: 5,  shots: 2, gun: 'mg',     voice: 'alex',   shape: 1, rank: 0, color: '#c58bff', role: 'Radio Operator', perk: 'Artillery: 6 damage in 3x3, lands next turn.', arty: 1 },
@@ -20,10 +20,45 @@ const ENEMY_DEFS = {
   centipede: { name: 'Burrower', img: 'centipede', hp: 22, mv: 4, aim: 90, dmg: [4, 4], range: 1, melee: true, desc: 'Crushes cover in its path.', boss: true },
 };
 
+// ---------- progression: scrap + upgrades, saved on this device ----------
+const UPGRADES = [
+  { id: 'hp', label: 'HEALTH', max: 3, cost: [15, 30, 50] },
+  { id: 'dmg', label: 'DAMAGE', max: 3, cost: [20, 40, 65] },
+  { id: 'mv', label: 'MOVE', max: 2, cost: [25, 50] },
+  { id: 'aim', label: 'AIM', max: 3, cost: [15, 30, 50] },
+];
+const Save = {
+  data: null,
+  blank() { const up = {}; for (const k of Object.keys(SQUAD_DEFS)) up[k] = { hp: 0, dmg: 0, mv: 0, aim: 0 }; return { v: 1, scrap: 0, runs: 0, wins: 0, up }; },
+  load() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem('robotwarfare.save') || 'null'); } catch (e) {}
+    this.data = this.blank();
+    if (d && d.up) { this.data.scrap = d.scrap | 0; this.data.runs = d.runs | 0; this.data.wins = d.wins | 0; for (const k in this.data.up) Object.assign(this.data.up[k], d.up[k] || {}); }
+  },
+  write() { try { localStorage.setItem('robotwarfare.save', JSON.stringify(this.data)); } catch (e) {} },
+  reset() { this.data = this.blank(); this.write(); },
+};
+Save.load();
+// a soldier's stats with upgrades applied. Gunners (multi-round weapons) get extra rounds instead of damage.
+function statsFor(id) {
+  const d = SQUAD_DEFS[id], L = Save.data.up[id];
+  const s = { ...d, dmg: d.dmg.slice() };
+  s.hp = d.hp + L.hp; s.mv = d.mv + L.mv; s.aim = d.aim + L.aim * 5;
+  if (d.shots >= 4) s.shots = d.shots + L.dmg; else { s.dmg[0] += L.dmg; s.dmg[1] += L.dmg; }
+  return s;
+}
+function statText(s, id) {
+  if (id === 'hp') return String(s.hp);
+  if (id === 'mv') return String(s.mv);
+  if (id === 'aim') return String(s.aim);
+  return s.shots >= 4 ? s.shots + 'x' + s.dmg[0] : s.dmg[0] + (s.dmg[1] > s.dmg[0] ? '-' + s.dmg[1] : '') + (s.shots > 1 ? ' x' + s.shots : '');
+}
+
 const units = [];
 let uid = 0;
 function makeSoldier(id, x, y) {
-  const d = SQUAD_DEFS[id];
+  const d = statsFor(id);
   const u = { id: uid++, key: id, side: 'player', ...d, maxhp: d.hp, x, y, ox: 0, oy: 0, flip: false, alive: true,
     moved: false, acted: false, overwatch: false, anim: { name: 'idle', t: Math.random() }, kills: 0, extracted: false };
   units.push(u); return u;
@@ -108,7 +143,7 @@ function fx(kind, x, y, opts = {}) {
   else if (kind === 'laser') light(x, y, 26, 0.15, '255,70,70');
   else if (kind === 'smallexp') light(x, y, 56, 0.45, '255,150,60');
   else if (kind === 'bigexp') light(x, y, 90, 0.6, '255,170,70');
-  FX.push({ img, fw, n, fps, x, y, t: 0, flip: opts.flip, delay: opts.delay || 0, row: opts.row || 0, off: opts.off || 0, alpha: opts.alpha });
+  FX.push({ img, fw, n, fps, x, y, t: 0, flip: opts.flip, delay: opts.delay || 0, row: opts.row || 0, off: opts.off || 0, alpha: opts.alpha, scale: opts.scale || 1 });
 }
 function floatText(s, x, y, color = C.white, big) { FLOAT.push({ s, x, y, t: 0, color, big }); }
 function particles(x, y, n, color, spd = 40, life = 0.6) {
@@ -133,7 +168,8 @@ function drawFX(sx, sy) {
     if (e.delay > 0) continue;
     const f = Math.min(e.n - 1, Math.floor(e.t * e.fps)) + e.off;
     const h = I[e.img].height;
-    spr(I[e.img], f * e.fw, 0, e.fw, h, e.x - sx - e.fw / 2, e.y - sy - h / 2, e.flip, e.alpha);
+    if (e.scale > 1) { if (e.alpha !== undefined) ctx.globalAlpha = e.alpha; ctx.drawImage(I[e.img], f * e.fw, 0, e.fw, h, Math.round(e.x - sx - e.fw * e.scale / 2), Math.round(e.y - sy - h * e.scale / 2), e.fw * e.scale, h * e.scale); ctx.globalAlpha = 1; }
+    else spr(I[e.img], f * e.fw, 0, e.fw, h, e.x - sx - e.fw / 2, e.y - sy - h / 2, e.flip, e.alpha);
   }
   for (const p of PROJ) {
     if (p.kind === 'grenade') spr(I.grenade, (Math.floor(p.t * 20) % 8) * 8, 0, 8, 8, p.x - sx - 4, p.y - sy - 4);

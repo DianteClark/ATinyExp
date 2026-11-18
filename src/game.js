@@ -14,7 +14,8 @@ function sleep(s) { return new Promise(res => timers.push({ t: gt + s, res })); 
 function pause(s) { return skipping ? Promise.resolve() : sleep(s); }
 function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 function rint(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
-const soldiers = () => units.filter(u => u.side === 'player' && u.alive && !u.extracted);
+const soldiers = () => units.filter(u => u.side === 'player' && u.alive && !u.extracted && !u.downed);
+const downedList = () => units.filter(u => u.side === 'player' && u.alive && u.downed);
 const enemies = () => units.filter(u => u.side === 'enemy' && u.alive);
 const byKey = k => units.find(u => u.key === k);
 
@@ -22,7 +23,7 @@ const byKey = k => units.find(u => u.key === k);
 function newGame() {
   units.length = 0; objects.length = 0; LIGHTS.length = 0; FX.length = 0; PROJ.length = 0; FLOAT.length = 0; PARTS.length = 0;
   Object.assign(G, { turn: 1, phase: 'find', busy: false, sel: null, mode: 'move', reachMap: null, holdTurns: -1, holdEnemyTurns: 0,
-    dropship: null, artyQueue: [], stats: { kills: 0, shots: 0, hits: 0 }, flags: {}, banner: null, tip: null, bubbles: [], centipede: null, msgs: [] });
+    dropship: null, wash: null, artyQueue: [], stats: { kills: 0, shots: 0, hits: 0 }, flags: {}, banner: null, tip: null, bubbles: [], centipede: null, msgs: [], scrap: 0, earned: null, lastDialog: null, dialogGap: 0 });
   buildMap();
   makeSoldier('reyes', 3, 20); makeSoldier('okafor', 2, 21); makeSoldier('haas', 4, 21); makeSoldier('lin', 3, 22);
   const v = makeSoldier('vance', 6, 4); v.side = 'npc'; setAnim(v, 'crawl');
@@ -32,6 +33,7 @@ function newGame() {
   makeEnemy('spider', 12, 6, 'C');
   makeEnemy('scarab', 23, 6, 'D'); makeEnemy('scarab', 25, 8, 'D'); makeEnemy('spider', 22, 4, 'D');
   makeEnemy('scarab', 33, 10, 'E');
+  for (const [x, y] of [[4, 4], [26, 8], [25, 22], [38, 18]]) placeObj('cache', x, y);
   computeVis(true);
   camTo(5 * TS, 19 * TS, true);
   G.objective = 'Find Pvt. Vance in the Halvorsen office (north).';
@@ -223,7 +225,7 @@ async function hitObject(o) {
 }
 
 async function applyDamage(u, dmg, src, quiet) {
-  if (!u.alive) return;
+  if (!u.alive || u.downed) return;
   u.hp -= dmg;
   const [cx, cy] = centerOf(u);
   floatText('-' + dmg, cx, cy, C.red);
@@ -241,9 +243,12 @@ async function applyDamage(u, dmg, src, quiet) {
 }
 
 async function killUnit(u, src) {
+  if (u.side === 'player') return downUnit(u);
   u.alive = false; u.hp = 0; u.overwatch = false;
   if (u.side === 'enemy') {
     G.stats.kills++; if (src && src.side === 'player') { src.kills++; G.slowmo = 0.35; buzz(25); }
+    const val = SCRAP_FOR[u.key] || 0;
+    if (val) { G.scrap += val; const [qx, qy] = centerOf(u); setTimeout(() => floatText('+' + val, qx, qy - 6, C.yellow), 350); }
     if (u.segs) { return centipedeDeath(u); }
     const [cx, cy] = centerOf(u);
     fx('smallexp', cx, cy - 2); Audio2.play('expS', 0.5);
@@ -251,15 +256,48 @@ async function killUnit(u, src) {
     u.corpse = true; u.alive = false;
     if (!G.flags.firstKill && src && src.side === 'player') { G.flags.firstKill = true; bubble(src, ['Scrap metal!', 'Got one!', 'Down!'][rint(0, 2)]); }
     else if (src && src.side === 'player' && Math.random() < 0.35) bubble(src, ['Target down.', 'Next!', 'Clear!', 'Bug splat.'][rint(0, 3)]);
-  } else {
-    setAnim(u, 'death'); u.alive = false; u.dead = true;
-    Audio2.voice(u.voice, 'death', true);
-    const others = soldiers(); if (others.length) bubble(others[rint(0, others.length - 1)], u.short === 'REYES' ? 'Sarge is down!' : u.short + ' is down!');
-    message(u.name + ' is down.', C.red);
-    if (G.sel === u) G.sel = null;
   }
   await sleep(0.4);
 }
+
+const SCRAP_FOR = { spider: 5, scarab: 8, hornet: 6, wasp: 2, centipede: 50 };
+async function downUnit(u) {
+  u.downed = true; u.hp = 0; u.bleed = 3; u.overwatch = false; u.acted = true;
+  setAnim(u, 'death');
+  Audio2.voice(u.voice, 'death', true); buzz([30, 40, 60]);
+  const others = soldiers();
+  if (others.length) bubble(others[rint(0, others.length - 1)], u.key === 'reyes' ? 'Sarge is down! Get to her!' : u.short.charAt(0) + u.short.slice(1).toLowerCase() + ' is down!');
+  message(u.name + ' is down! Revive within 3 turns.', C.red);
+  if (G.sel === u) { G.sel = null; G.reachMap = null; }
+  if (!G.flags.reviveTip) { G.flags.reviveTip = true; showTip('A downed soldier bleeds out in 3 turns. Move a squadmate next to them, then tap the downed soldier to revive them with 3 HP. Reviving uses that squadmate\'s action.'); }
+  await sleep(0.4);
+}
+async function playerRevive(s, u) {
+  G.busy = true; G.reachMap = null; s.acted = true; s.overwatch = false;
+  s.flip = u.x < s.x; setAnim(s, 'crawl');
+  Audio2.play('equip', 0.5); bubble(s, ['Stay with me!', 'Up you get!', 'Not today.'][rint(0, 2)], 1.6);
+  for (let i = 0; i < 6; i++) { particles(u.x * TS + 8, u.y * TS + 10, 3, '#3ee03e', 30, 0.6); await sleep(0.1); }
+  u.downed = false; u.hp = 3; u.bleed = 0; u.acted = true; u.moved = true;
+  setAnim(u, 'idle'); setAnim(s, 'idle');
+  floatText('+3', u.x * TS + 8, u.y * TS + 4, C.green); Audio2.play('chime', 0.5);
+  setTimeout(() => Audio2.voice(u.voice, 'ready', true), 300);
+  message(u.name + ' is back on their feet.', C.green);
+  computeVis();
+  G.busy = false;
+  afterAction();
+}
+// who can speak: Overwatch always; soldiers only when up (Vance only once found)
+function canSpeak(k) {
+  if (k === 'overwatch') return true;
+  const u = byKey(k); return !!(u && u.alive && !u.downed && (u.side === 'player' || (k === 'vance' && G.phase !== 'find')));
+}
+function line(who, text) {
+  const list = Array.isArray(who) ? who : [who];
+  const k = list.find(canSpeak);
+  return k ? say(k, text) : Promise.resolve();
+}
+const SQUAD_ORDER = ['reyes', 'okafor', 'haas', 'lin', 'vance'];
+const anyBut = (...first) => [...first, ...SQUAD_ORDER.filter(k => !first.includes(k))];
 
 async function centipedeDeath(u) {
   G.flags.burrowerKilled = true;
@@ -270,8 +308,8 @@ async function centipedeDeath(u) {
     await sleep(0.18);
   }
   u.corpse = true;
-  await say('lin', 'It\'s down. The big one is DOWN.');
-  await say('okafor', 'Somebody owes me a drink.');
+  await line(anyBut('lin'), 'It\'s down. The big one is DOWN.');
+  await line(anyBut('okafor').filter(k => k !== 'lin'), 'Somebody owes me a drink.');
 }
 
 // explosions: grenades, barrels, artillery
@@ -359,15 +397,15 @@ async function onSpotted(list, spotter) {
   await sleep(0.5);
   if (!G.flags.firstContact) {
     G.flags.firstContact = true;
-    await say(spotter.key, types.has('spider') ? 'Contact! Spiders! They close fast, keep something solid at your back.' : 'Contact! Bugs ahead!');
-    await say('reyes', 'Weapons free, Kestrel. Make every shot count.');
+    await say(spotter.key, types.has('spider') ? 'Contact! Spiders! They close fast. Keep something solid at your back.' : 'Contact! Bugs ahead!');
+    await line(anyBut('reyes').filter(k => k !== spotter.key), 'Weapons free, Kestrel. Make every shot count.');
     showTip((COARSE ? 'Tap a red-bracketed enemy to see your odds, tap again to fire.' : 'Click a red-bracketed enemy to fire.') + ' Cover lowers your odds: half cover -20, full cover -40.');
   } else if (types.has('scarab') && !G.flags.scarab) {
     G.flags.scarab = true;
-    await say('okafor', 'Scarab. Plasma cannon, thick shell. Don\'t stand in the open.');
+    await line(anyBut('okafor'), 'Scarab. Plasma cannon, thick shell. Don\'t stand in the open.');
   } else if (types.has('hornet') && !G.flags.hornet) {
     G.flags.hornet = true;
-    await say('lin', 'Hornets! Flyers ignore the cars. Shoot them out of the sky.');
+    await line(anyBut('lin'), 'Hornets! Flyers go right over the cars. Shoot them out of the sky.');
   }
   G.busy = wasBusy;
 }
@@ -378,14 +416,14 @@ function showTip(s) { if (COARSE) s = s.replace(/Click/g, 'Tap').replace(/click/
 
 // ---------------- player actions ----------------
 function selectUnit(u, quiet) {
-  if (!u || u.side !== 'player' || !u.alive || u.extracted) return;
+  if (!u || u.side !== 'player' || !u.alive || u.extracted || u.downed) return;
   G.armed = null;
   G.sel = u; G.mode = 'move';
   G.reachMap = (!u.moved && !u.acted) ? reach(u, u.mv) : null;
   if (!quiet) { Audio2.play('select', 0.4); if (Math.random() < 0.6) Audio2.voice(u.voice, 'sel'); }
   camTo(u.x * TS + 8, u.y * TS + 8);
 }
-function hasActions(u) { return u.alive && !u.extracted && !u.acted; }
+function hasActions(u) { return u.alive && !u.extracted && !u.acted && !u.downed; }
 function nextSoldier(fromCurrent) {
   const list = soldiers().filter(hasActions);
   if (!list.length) { G.sel = null; G.reachMap = null; return; }
@@ -441,6 +479,13 @@ function autoEnd() {
 // ---------------- turn flow ----------------
 async function startPlayerTurn() {
   G.state = 'banner'; G.busy = true;
+  for (const u of downedList()) if (u.bleed <= 0) {
+    camTo(u.x * TS + 8, u.y * TS + 8); await sleep(0.5);
+    u.alive = false; u.dead = true; u.downed = false;
+    message(u.name + ' didn\'t make it.', C.red); Audio2.play('lose', 0.35, 1.2);
+    floatText('KIA', u.x * TS + 8, u.y * TS, C.red);
+    await sleep(0.8);
+  }
   for (const u of soldiers()) { u.moved = false; u.acted = false; if (!u.overwatch) setAnim(u, 'idle'); }
   // pending artillery
   if (G.artyQueue.length) {
@@ -456,7 +501,7 @@ async function startPlayerTurn() {
   await bannerShow('PLAYER PHASE', C.cyan, 'Turn ' + G.turn, false, 1.1);
   if (G.phase === 'hold') {
     G.holdTurns--;
-    if (G.holdTurns <= 0) await dropshipArrives();
+    if (G.holdTurns <= 0) { await dropshipArrives(); return; }
   }
   if (await checkEnd()) return;
   G.state = 'player'; G.busy = false;
@@ -468,6 +513,7 @@ async function endPlayerTurn() {
   if (G.state !== 'player' || G.busy) return;
   G.busy = true; G.sel = null; G.reachMap = null; G.mode = 'move'; G.armed = null;
   if (mouse.touch) G.hover = null;
+  for (const u of downedList()) u.bleed--;
   Audio2.play('selbig', 0.4);
   await enemyTurn();
 }
@@ -577,6 +623,12 @@ async function centipedeAct(e) {
 
 // ---------------- mission script ----------------
 async function checkTriggers(u) {
+  const o = u.alive && objAt[u.y] && objAt[u.y][u.x];
+  if (o && o.type === 'cache') {
+    removeObj(o); G.scrap += 15;
+    floatText('+15', u.x * TS + 8, u.y * TS, C.yellow); Audio2.play('complete', 0.45); Audio2.play('equip', 0.3);
+    message('Supply cache: +15 scrap', C.yellow); bubble(u, 'Supplies!', 1.4);
+  }
   // Vance rescue
   const v = byKey('vance');
   if (G.phase === 'find' && v.side === 'npc' && u.alive && los(u.x, u.y, v.x, v.y) && dist(u, v) <= 4.5) {
@@ -585,11 +637,6 @@ async function checkTriggers(u) {
   }
   // LZ reached
   if (G.phase === 'toLZ' && soldiers().some(s => onPad(s.x, s.y))) { await startHold(); }
-  // extraction
-  if (G.phase === 'extract') {
-    for (const s of soldiers()) if (onPad(s.x, s.y)) await extract(s);
-    await checkEnd();
-  }
 }
 function onPad(x, y) { return x >= 33 && x <= 36 && y >= 3 && y <= 6; }
 
@@ -599,19 +646,19 @@ async function rescueVance(u, v) {
   setAnim(v, 'idle'); v.flip = u.x < v.x;
   Audio2.voice('alex', 'sel', true);
   await say('vance', 'Kestrel? Oh, thank god. I thought you were the bugs knocking.');
-  await say('reyes', 'Vance. You hurt?');
-  await say('vance', 'Just my pride. Radio\'s still good for one fire mission. Point me at something ugly.');
+  await line(anyBut('reyes'), 'Vance. You hurt?');
+  await say('vance', 'Just my pride. My radio has one fire mission left in it. Point me at something ugly.');
   v.side = 'player'; v.moved = true; v.acted = true;
   message('Pvt. Vance joins the squad.', C.green);
   Audio2.play('chime', 0.5);
-  await say('reyes', 'Overwatch, Kestrel. We have Vance. Moving to the pad.');
+  await line(anyBut('reyes').filter(k => k !== 'vance'), 'Overwatch, Kestrel. We have Vance. Moving to the pad.');
   await say('overwatch', 'Good copy. Bad news: you made noise. Flyers inbound from the north. Get to that pad.');
   // reinforcements
   Audio2.play('warning', 0.5); Audio2.play('buzz', 0.4);
   const sp = [['hornet', 30, 0], ['hornet', 37, 2], ['wasp', 26, 0], ['wasp', 39, 6]];
   for (const [t, x, y] of sp) { const e = spawnEnemy(t, x, y, 'R1'); e.active = true; }
   G.phase = 'toLZ';
-  G.objective = 'Get the squad to the helipad in the east lot.';
+  G.objective = 'Get the squad to the helipad in the northeast lot.';
   bannerShow('OBJECTIVE UPDATED', C.yellow, 'Reach the landing zone', true);
   showTip('Vance can call ARTILLERY once (ARTY button): 6 damage in a 3x3 area, landing at the start of your next turn. Mark where the bugs will be.');
   computeVis();
@@ -624,11 +671,13 @@ async function startHold() {
   fx('smoke', 35 * TS, 4 * TS);
   const s = soldiers().find(s => onPad(s.x, s.y));
   Audio2.voice(s ? s.voice : 'meghan', 'obj', true);
-  await say('reyes', 'Overwatch, Kestrel is on the pad. Send the bird.');
+  await line(anyBut('reyes'), 'Overwatch, Kestrel is on the pad. Send the bird.');
   await say('overwatch', 'Bird\'s away. Three turns out. Hold that pad, Kestrel.');
-  await say('okafor', 'Three turns. Easy.');
-  await say('lin', 'You said that in Kessel.');
-  await say('okafor', 'And we lived.');
+  if (canSpeak('okafor') && canSpeak('lin')) {
+    await say('okafor', 'Three turns. Easy.');
+    await say('lin', 'You said that in Kessel.');
+    await say('okafor', 'And we lived.');
+  }
   G.objective = 'Hold the landing zone until the dropship arrives.';
   Music.play('battle');
   bannerShow('HOLD THE LZ', C.orange, 'Dustoff in 3 turns', true);
@@ -661,7 +710,7 @@ async function burrowerEmerges() {
   Music.stop(1.5);
   Audio2.play('rumble', 0.9, 0.8); cam.shake = 3;
   for (let i = 0; i < 12; i++) { particles(37.5 * TS + rint(-14, 14), 12.5 * TS + rint(-10, 10), 3, '#1f6363', 40); await sleep(0.08); }
-  await say('vance', 'Uh. Sarge? The ground\'s moving.');
+  await line(anyBut('vance', 'haas'), 'Uh... guys? The ground is moving.');
   Audio2.play('rumble', 1, 0.6); Audio2.play('heavy', 0.8); Audio2.play('sting', 0.8);
   cam.shake = 7;
   for (let i = 0; i < 3; i++) fx('bigfrag', (36.5 + i) * TS, 12 * TS, { delay: i * 0.1 });
@@ -673,36 +722,33 @@ async function burrowerEmerges() {
   computeVis();
   Music.play('boss');
   await sleep(0.5);
-  await say('lin', 'What... is that.');
+  await line(anyBut('lin'), 'What... is that.');
   await say('overwatch', 'Kestrel, that is a Burrower. Do NOT try to kill it. Survive it.');
-  await say('haas', 'Watch it, it\'s chewing straight through the cover!');
-  await say('reyes', 'You heard her. Nobody gets eaten. Hold the pad!');
+  await line(anyBut('haas', 'okafor').filter(k => k !== 'reyes'), 'It\'ll plough straight through cover. Don\'t bunch up!');
+  await line(anyBut('reyes'), 'You heard Overwatch. Nobody gets eaten. Hold the pad!');
   showTip('The Burrower has 22 HP and crushes any cover it crawls through. You don\'t have to kill it. Just survive until dustoff.');
 }
 
+// rotor wash: the bird is never drawn, only the dust it kicks up (pack smoke sprites)
+function washAt(x, y) { G.wash = { x, y, t: 0, on: true, strength: 1 }; }
+
 async function dropshipArrives() {
   G.phase = 'extract';
-  Audio2.play('plane', 0.9);
-  camTo(34.5 * TS, 4.5 * TS);
-  G.dropship = { t: 0, landed: false };
-  await sleep(2.2);
-  G.dropship.landed = true;
-  for (let i = 0; i < 10; i++) fx('smoke', (33 + Math.random() * 4) * TS, (3 + Math.random() * 4) * TS, { delay: i * 0.05 });
+  G.state = 'cutscene'; G.busy = true; G.sel = null; G.reachMap = null;
+  Music.stop(1.5);
+  Audio2.play('plane', 1);
+  camTo(35 * TS, 5 * TS);
+  await say('overwatch', 'Kestrel, bird is overhead. Stay low, we\'re coming down on the pad!');
+  washAt(35 * TS, 5 * TS);
   cam.shake = 2;
-  await say('overwatch', 'Kestrel, the bird is on the pad. Everybody aboard, NOW!');
-  G.objective = 'Extract! Move every soldier onto the helipad.';
-  bannerShow('DUSTOFF', C.green, 'Move soldiers onto the pad', true);
-  showTip('Any soldier who ends a move on the helipad boards the dropship. The mission ends when everyone left alive is aboard.');
-  for (const s of soldiers()) if (onPad(s.x, s.y)) await extract(s);
-}
-
-async function extract(s) {
-  if (s.extracted) return;
-  Audio2.play('whoosh', 0.5); Audio2.voice(s.voice, 'go', true);
-  for (let k = 10; k >= 0; k--) { s.alpha = k / 10; s.oy = -(10 - k); await sleep(0.04); }
-  s.extracted = true; s.oy = 0;
-  message(s.name + ' is aboard.', C.green);
-  if (G.sel === s) G.sel = null;
+  await sleep(1.6);
+  // everyone still breathing goes home: the squad carries out anyone who is down
+  const going = units.filter(u => u.side === 'player' && u.alive && !u.extracted);
+  for (const u of going) if (u.downed) { u.downed = false; u.carried = true; }
+  for (let k = 10; k >= 0; k--) { for (const u of going) u.alpha = k / 10; await sleep(0.08); }
+  for (const u of going) u.extracted = true;
+  await sleep(0.6);
+  await victory();
 }
 
 function spawnEnemy(type, x, y, pod) {
@@ -719,22 +765,34 @@ function spawnEnemy(type, x, y, pod) {
 
 async function checkEnd() {
   if (G.state === 'win' || G.state === 'lose') return true;
-  const alive = units.filter(u => u.side === 'player' && u.alive);
-  if (!alive.length) { await defeat(); return true; }
-  if (G.phase === 'extract' && alive.every(u => u.extracted)) { await victory(); return true; }
+  const squad = units.filter(u => u.side === 'player');
+  const standing = squad.filter(u => u.alive && !u.downed && !u.extracted);
+  const aboard = squad.filter(u => u.extracted);
+  if (!standing.length && !aboard.length) { await defeat(); return true; }
   return false;
 }
 
+function bankScrap(win) {
+  const aboard = units.filter(u => u.side === 'player' && u.extracted).length;
+  const bonus = win ? 40 + aboard * 5 : 0;
+  G.earned = { kills: G.scrap, bonus, total: G.scrap + bonus };
+  Save.data.scrap += G.earned.total; Save.data.runs++; if (win) Save.data.wins++;
+  Save.write();
+}
 async function victory() {
   G.state = 'cutscene'; G.busy = true;
-  Music.stop(1);
-  G.dropship.leaving = true; Audio2.play('plane', 0.8);
-  await sleep(1.6);
   Audio2.play('win', 0.8);
-  await say('overwatch', 'Wheels up. Good work tonight, Kestrel.');
-  await say('reyes', 'Flag this for command, Overwatch. The swarm has something big living under the streets.');
-  if (G.flags.burrowerKilled) { await say('vance', 'Had. Past tense. We killed it.'); await say('overwatch', '...You were told not to engage. Drinks are on me.'); }
+  await bannerShow('MISSION CLEARED', C.green, 'Kestrel Squad extracted', false, 2.4);
+  if (G.wash) G.wash.leaving = true;
+  const lost = units.filter(u => SQUAD_DEFS[u.key] && u.side === 'player' && !u.alive);
+  const carried = units.filter(u => u.carried);
+  await say('overwatch', 'All aboard. Wheels up. Good work tonight, Kestrel.');
+  if (carried.length) await say('overwatch', carried.map(u => u.name).join(' and ') + (carried.length > 1 ? ' are' : ' is') + ' with the medic. They\'ll pull through.');
+  if (lost.length) await say('overwatch', (lost.length === 1 ? lost[0].name + ' won\'t be forgotten.' : 'We lost good people tonight.') + ' We\'ll bring them home when we take this district back.');
+  await line(anyBut('reyes'), 'Flag this for command. The swarm has something big living under the streets.');
+  if (G.flags.burrowerKilled) { await line(anyBut('vance', 'haas'), 'Had. Past tense. We killed it.'); await say('overwatch', '...You were told not to engage. Drinks are on me.'); }
   else await say('overwatch', 'Already flagged. Get some sleep. Tomorrow you go back in.');
+  bankScrap(true);
   G.state = 'win'; G.busy = false; G.endT = 0;
   Music.play('brief');
 }
@@ -744,27 +802,38 @@ async function defeat() {
   Audio2.play('static', 0.6); await sleep(0.4);
   Audio2.play('lose', 0.8);
   await say('overwatch', 'Kestrel? Kestrel, respond... Kestrel...');
+  bankScrap(false);
   G.state = 'lose'; G.busy = false; G.endT = 0;
 }
 
 async function runIntro() {
   G.state = 'cutscene'; G.busy = true;
   Music.play('brief');
-  Audio2.play('plane', 0.6);
-  setTimeout(() => Audio2.play('start', 0.6), 600);
   G.ambient = Audio2.loop('wind', 0.12);
-  camTo(4 * TS, 20 * TS, true);
-  await bannerShow('MISSION 1', C.yellow, 'DEAD SIGNAL', true, 2.2);
-  await pause(0.4);
-  await say('overwatch', 'Kestrel Squad, this is Overwatch. Drop confirmed. Welcome to Meridian District.');
+  const squad = ['reyes', 'okafor', 'haas', 'lin'].map(byKey);
+  for (const u of squad) u.alpha = 0;
+  camTo(3.5 * TS, 21 * TS, true);
+  bannerShow('MISSION 1', C.yellow, 'DEAD SIGNAL', true, 2.4);
+  // insertion: the bird is heard, never seen. Dust kicks up and the squad is there when it clears.
+  Audio2.play('plane', 0.7);
+  washAt(3.5 * TS, 21 * TS);
+  setTimeout(() => Audio2.play('start', 0.6), 600);
+  await pause(1.2);
+  for (const u of squad) {
+    if (!skipping) { Audio2.play('dirt', 0.4); fx('smoke', u.x * TS + 8, u.y * TS + 10, { scale: 2 }); for (let k = 1; k <= 6; k++) { u.alpha = k / 6; await sleep(0.05); } await sleep(0.12); }
+    u.alpha = 1;
+  }
+  await pause(0.5);
+  G.wash.leaving = true;
+  await say('overwatch', 'Kestrel Squad, Overwatch. You\'re on the ground. Welcome to Meridian District.');
   await say('overwatch', 'Six hours ago the swarm took the city grid. Ninety minutes ago our forward observer went dark.');
   camTo(8.5 * TS, 6 * TS); await pause(0.8);
   await say('overwatch', 'Private Eli Vance. His last ping came from the Halvorsen office block, north of you.');
   await say('reyes', 'Copy. We find Vance. Then what?');
   camTo(34.5 * TS, 5 * TS); await pause(1.2);
-  await say('overwatch', 'Then you get to the helipad in the east lot. Signal from the pad and we send the bird.');
-  await say('haas', 'And how long does the bird take?');
-  await say('overwatch', 'Three turns. Four if the pilot finishes his coffee.');
+  await say('overwatch', 'Then get to the helipad in the northeast lot. Call from the pad and the bird comes back for you.');
+  await say('haas', 'Why can\'t the bird just wait for us?');
+  await say('overwatch', 'Because the swarm shoots at birds, Private. Three turns from your call. Four if the pilot finishes his coffee.');
   camTo(4 * TS, 20 * TS); await pause(1.0);
   await say('okafor', 'Quiet streets. I hate quiet streets.');
   Audio2.play('crows', 0.35);
@@ -772,7 +841,7 @@ async function runIntro() {
   Audio2.voice('meghan', 'ready', true);
   await say('reyes', 'Eyes up, Kestrel. Stick to cover. Move out.');
   Music.play('explore', 2);
-  showTip(COARSE ? 'Tap a soldier, tap a green tile to preview the move, then tap it again to go. One move + one action per turn. Drag to look around.' : 'Click a soldier, then a green tile to move. Each soldier gets one move and one action per turn. Shields on a tile show the cover you\'d get there.');
+  showTip(COARSE ? 'Tap a soldier, tap a green tile to preview the move, then tap it again to go. One move + one action per turn. Drag to look around, pinch to zoom.' : 'Click a soldier, then a green tile to move. Each soldier gets one move and one action per turn. Shields on a tile show the cover you\'d get there.');
   G.turn = 1;
   await startPlayerTurn();
 }
